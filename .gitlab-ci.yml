@@ -6,7 +6,7 @@ allure_testops:
   image: python:latest
   variables:
     ALLURE_ENDPOINT: "https://testops.sport-express.ru"
-    ALLURE_PROJECT_ID: "15"
+    ALLURE_PROJECT_ID: "16"
     ALLURE_RESULTS: "allure-results"
     PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   script:
