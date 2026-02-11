@@ -1,0 +1,14 @@
+# Python venv
+venv/
+SE-mobile-tests/venv/
+
+# PyCharm
+.idea/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Allure
+allure-results/
+allure-report/
