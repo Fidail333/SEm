@@ -2,27 +2,28 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import List
 
 import pytest
 from playwright.sync_api import Browser, BrowserContext, Playwright, sync_playwright
 
-BASE_DIR = Path(__file__).resolve().parent
-URLS_FILE = BASE_DIR / "config" / "urls_mobile.txt"
-DEVICE_NAME = "iPhone 13"
-NAVIGATION_TIMEOUT_MS = 30_000
+from utils.загрузчик_url import загрузить_url_из_файла
+
+КОРЕНЬ_ПРОЕКТА = Path(__file__).resolve().parent
+ФАЙЛ_URL = КОРЕНЬ_ПРОЕКТА / "config" / "urls_mobile.txt"
+ИМЯ_УСТРОЙСТВА = "iPhone 13"
+ТАЙМАУТ_НАВИГАЦИИ_МС = 30_000
 
 
-def _to_bool(value: str) -> bool:
-    return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
+def _это_истина(значение: str) -> bool:
+    return str(значение).strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
 @pytest.fixture(scope="session")
-def mobile_urls() -> List[str]:
-    urls = [line.strip() for line in URLS_FILE.read_text(encoding="utf-8").splitlines() if line.strip()]
-    if not urls:
-        pytest.fail(f"No URLs found in {URLS_FILE}")
-    return urls
+def mobile_urls() -> list[str]:
+    url_список = загрузить_url_из_файла(ФАЙЛ_URL)
+    if not url_список:
+        pytest.fail(f"Файл со ссылками пуст: {ФАЙЛ_URL}")
+    return url_список
 
 
 @pytest.fixture(scope="session")
@@ -33,24 +34,24 @@ def playwright_instance() -> Playwright:
 
 @pytest.fixture(scope="session")
 def browser(playwright_instance: Playwright) -> Browser:
-    headless = _to_bool(os.getenv("HEADLESS", "1"))
-    browser_instance = playwright_instance.chromium.launch(headless=headless)
-    yield browser_instance
-    browser_instance.close()
+    headless = _это_истина(os.getenv("HEADLESS", "1"))
+    браузер = playwright_instance.chromium.launch(headless=headless)
+    yield браузер
+    браузер.close()
 
 
 @pytest.fixture
 def context(browser: Browser, playwright_instance: Playwright) -> BrowserContext:
-    device = playwright_instance.devices[DEVICE_NAME]
-    context_instance = browser.new_context(**device)
-    context_instance.set_default_navigation_timeout(NAVIGATION_TIMEOUT_MS)
-    context_instance.set_default_timeout(NAVIGATION_TIMEOUT_MS)
-    yield context_instance
-    context_instance.close()
+    профиль_устройства = playwright_instance.devices[ИМЯ_УСТРОЙСТВА]
+    контекст = browser.new_context(**профиль_устройства)
+    контекст.set_default_navigation_timeout(ТАЙМАУТ_НАВИГАЦИИ_МС)
+    контекст.set_default_timeout(ТАЙМАУТ_НАВИГАЦИИ_МС)
+    yield контекст
+    контекст.close()
 
 
 @pytest.fixture
 def page(context: BrowserContext):
-    page_instance = context.new_page()
-    yield page_instance
-    page_instance.close()
+    страница = context.new_page()
+    yield страница
+    страница.close()

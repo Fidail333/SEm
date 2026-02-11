@@ -1,8 +1,8 @@
-# SE Mobile Tests
+# Автотесты MOBILE WEB для Sport-Express
 
-Production-ready smoke suite for **mobile web** checks of Sport-Express.
+Production-ready проект автотестов для проверки мобильной версии сайта Sport-Express.
 
-## Stack
+## Технологии
 - Python 3.11+
 - pytest
 - Playwright (sync API)
@@ -10,77 +10,62 @@ Production-ready smoke suite for **mobile web** checks of Sport-Express.
 - pytest-rerunfailures
 - pytest-timeout
 
-## Project structure
+## Структура проекта
 
 ```text
 SE-mobile-tests/
  ├── tests/
- │    └── test_mobile_urls.py
+ │    └── test_mobile_smoke_urls.py
  ├── config/
  │    └── urls_mobile.txt
  ├── utils/
- │    └── console_collector.py
+ │    ├── загрузчик_url.py
+ │    └── сборщик_консоли.py
  ├── conftest.py
  ├── pytest.ini
  ├── requirements.txt
  └── README.md
 ```
 
-## Installation
+## Команды
 
-1. Create and activate virtual environment (Windows example):
-
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-```
-
-2. Install dependencies:
+### 1) Установка
 
 ```bash
 pip install -r requirements.txt
+playwright install
 ```
 
-3. Install Playwright browser:
+### 2) Запуск headless
 
 ```bash
-python -m playwright install chromium
+pytest -q --alluredir=allure-results
 ```
 
-## Running tests
+### 3) Запуск с открытым браузером (PowerShell)
 
-### Headless mode (default)
+```powershell
+$env:HEADLESS="0"; pytest -q --alluredir=allure-results
+```
+
+### 4) Allure
 
 ```bash
-set HEADLESS=1
-pytest --alluredir=allure-results
+allure serve allure-results
 ```
 
-### With visible browser
+## Что проверяет каждый тест
+- открытие страницы через `page.goto(url, wait_until="domcontentloaded")`;
+- наличие объекта `response`;
+- HTTP-статус только `200` или `304`;
+- отсутствие ошибок браузерной консоли (`type == "error"`);
+- при падении: скриншот, URL, статус ответа и ошибки консоли прикладываются в Allure.
 
-```bash
-set HEADLESS=0
-pytest --alluredir=allure-results
-```
-
-## Allure report
-
-Generate report:
-
-```bash
-allure generate allure-results --clean -o allure-report
-```
-
-Open report:
-
-```bash
-allure open allure-report
-```
-
-## What is validated for each URL
-- open page with `page.goto(url, wait_until="domcontentloaded")`
-- assert `response` is not `None`
-- assert HTTP status is in `[200, 304]`
-- collect browser console messages with `type == "error"`
-- fail test if any console errors are found
-- on failure attach screenshot + console errors to Allure
+## Параметры запуска
+- Эмуляция устройства: **iPhone 13** (`playwright.devices`).
+- Браузер: **Chromium**.
+- `HEADLESS=1` по умолчанию.
+- Если `HEADLESS=0`, тесты запускаются в видимом режиме.
+- Таймаут навигации: `30000 ms`.
+- Таймаут теста: `60000 ms`.
+- Повторы упавшего теста: `2` (задержка `2` секунды).
