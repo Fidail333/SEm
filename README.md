@@ -217,8 +217,3 @@ pytest -k mobile_smoke --alluredir=allure-results
 
 и первые 30 строк лога запуска .\scripts\run.ps1
 
-perl
-Копировать код
-
-Если хочешь — я подстрою README под **точные команды твоих `setup.ps1`/`run.ps1`** (как они сейчас в репе) и добавлю “1 командой всё установить” после того, как выровняем `setup.ps1`.
-::contentReference[oaicite:0]{index=0}
