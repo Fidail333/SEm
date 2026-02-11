@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 import pytest
-from playwright.sync_api import Browser, BrowserContext, Playwright, sync_playwright
+from playwright.sync_api import Browser, BrowserContext, Page, Playwright, sync_playwright
 
 from utils.загрузчик_url import загрузить_url_из_файла
 
@@ -12,10 +12,6 @@ from utils.загрузчик_url import загрузить_url_из_файла
 ФАЙЛ_URL = КОРЕНЬ_ПРОЕКТА / "config" / "urls_mobile.txt"
 УСТРОЙСТВА = ["iPhone 13", "Pixel 7"]
 ТАЙМАУТ_НАВИГАЦИИ_МС = 30_000
-
-
-def _это_истина(значение: str) -> bool:
-    return str(значение).strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
@@ -29,21 +25,21 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
         metafunc.parametrize("device_name", УСТРОЙСТВА, ids=УСТРОЙСТВА)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def playwright_instance() -> Playwright:
     with sync_playwright() as playwright:
         yield playwright
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def browser(playwright_instance: Playwright) -> Browser:
-    headless = _это_истина(os.getenv("HEADLESS", "1"))
+    headless = os.getenv("HEADLESS") == "1"
     браузер = playwright_instance.chromium.launch(headless=headless)
     yield браузер
     браузер.close()
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def context(
     browser: Browser,
     playwright_instance: Playwright,
@@ -57,8 +53,8 @@ def context(
     контекст.close()
 
 
-@pytest.fixture
-def page(context: BrowserContext):
+@pytest.fixture(scope="function")
+def page(context: BrowserContext) -> Page:
     страница = context.new_page()
     yield страница
     страница.close()
