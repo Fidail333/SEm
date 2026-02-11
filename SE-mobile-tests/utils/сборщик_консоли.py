@@ -19,8 +19,8 @@ class СборщикКонсоли:
             self.ошибки.append(сообщение.text)
 
     @property
-    def есть_ошибки(self) -> bool:
-        return bool(self.ошибки)
+    def количество_ошибок(self) -> int:
+        return len(self.ошибки)
 
     def как_текст(self) -> str:
         if not self.ошибки:
