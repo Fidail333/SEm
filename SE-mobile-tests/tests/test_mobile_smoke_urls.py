@@ -37,9 +37,32 @@ def _проверить_http_статус(url: str, response: Response) -> None:
     )
 
 
+def _приложить_состояние_консоли(сборщик_консоли: СборщикКонсоли) -> None:
+    if сборщик_консоли.количество_ошибок > 0:
+        allure.dynamic.severity(allure.severity_level.MINOR)
+        allure.dynamic.tag("console-warning")
+        allure.dynamic.label("console-warning", "true")
+        allure.attach(
+            f"Количество ошибок консоли: {сборщик_консоли.количество_ошибок}\n\n"
+            f"{сборщик_консоли.как_текст()}",
+            name="⚠ Ошибки консоли (не блокируют)",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+    else:
+        allure.dynamic.severity(allure.severity_level.TRIVIAL)
+        allure.attach(
+            "Ошибок консоли не обнаружено",
+            name="Ошибок консоли не обнаружено",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+
+
 @pytest.mark.timeout(90)
 def test_mobile_smoke_urls(url: str, device_name: str, page: Page) -> None:
-    allure.dynamic.title(f"Мобайл смоук | {device_name} | {url}")
+    allure.dynamic.parent_suite("SE Mobile Web")
+    allure.dynamic.suite(device_name)
+    allure.dynamic.sub_suite("Smoke URLs")
+    allure.dynamic.title(f"{device_name} | {url}")
 
     сборщик_консоли = СборщикКонсоли()
     сборщик_консоли.подключить(page)
@@ -70,21 +93,13 @@ def test_mobile_smoke_urls(url: str, device_name: str, page: Page) -> None:
             page.wait_for_timeout(800)
 
         with allure.step("Жду полной готовности документа (document.readyState === 'complete')"):
-            page.wait_for_function("() => document.readyState === 'complete'")
+            page.wait_for_function("document.readyState === 'complete'", timeout=20_000)
 
-        with allure.step("Проверяю, что страница реально отрисована"):
-            страница_отрисована = page.evaluate(
-                """
-                () => {
-                    const body = document.body;
-                    if (!body) {
-                        return false;
-                    }
-                    return body.innerText && body.innerText.trim().length > 0;
-                }
-                """
+        with allure.step("Проверяю, что body содержит текст"):
+            page.wait_for_function(
+                "document.body && document.body.innerText && document.body.innerText.length > 0",
+                timeout=20_000,
             )
-            assert страница_отрисована, "Страница не отрисована: body отсутствует или не содержит текста."
 
         with allure.step("Проверяю, что ответ сервера получен"):
             assert response is not None, (
@@ -94,14 +109,6 @@ def test_mobile_smoke_urls(url: str, device_name: str, page: Page) -> None:
 
         with allure.step("Проверяю HTTP-статус согласно правилам"):
             _проверить_http_статус(url, response)
-
-        with allure.step("Прикладываю ошибки консоли (не блокируют)"):
-            allure.attach(
-                f"Количество ошибок консоли: {сборщик_консоли.количество_ошибок}\n\n"
-                f"{сборщик_консоли.как_текст()}",
-                name="Ошибки консоли (не блокируют)",
-                attachment_type=allure.attachment_type.TEXT,
-            )
 
     except Exception:
         ПАПКА_АРТЕФАКТОВ.mkdir(parents=True, exist_ok=True)
@@ -129,3 +136,6 @@ def test_mobile_smoke_urls(url: str, device_name: str, page: Page) -> None:
             attachment_type=allure.attachment_type.TEXT,
         )
         raise
+    finally:
+        with allure.step("Фиксирую результат проверки консоли (неблокирующий)"):
+            _приложить_состояние_консоли(сборщик_консоли)
