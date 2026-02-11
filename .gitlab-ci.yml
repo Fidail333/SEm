@@ -9,6 +9,7 @@ allure_testops:
     ALLURE_PROJECT_ID: "16"
     ALLURE_RESULTS: "allure-results"
     PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+    HEADLESS: "1"
   script:
     - pip install -r SE-mobile-tests/requirements.txt
     - python -m playwright install --with-deps
