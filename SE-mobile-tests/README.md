@@ -1,6 +1,8 @@
 # Автотесты MOBILE WEB для Sport-Express
 
-Production-ready проект автотестов для проверки мобильной версии сайта Sport-Express.
+Production-ready проект автотестов для smoke-проверки мобильной версии Sport-Express на двух устройствах одновременно:
+- iPhone 13 (iOS)
+- Pixel 7 (Android)
 
 ## Технологии
 - Python 3.11+
@@ -21,51 +23,68 @@ SE-mobile-tests/
  ├── utils/
  │    ├── загрузчик_url.py
  │    └── сборщик_консоли.py
+ ├── scripts/
+ │    ├── setup.ps1
+ │    └── run.ps1
  ├── conftest.py
  ├── pytest.ini
  ├── requirements.txt
  └── README.md
 ```
 
-## Команды
+## Быстрый старт (Windows PowerShell)
 
-### 1) Установка
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
+```
 
-```bash
+## Запуск
+
+```powershell
+.\scripts\run.ps1
+```
+
+## Ручной запуск
+
+```powershell
 pip install -r requirements.txt
-playwright install
-```
-
-### 2) Запуск headless
-
-```bash
+python -m playwright install
 pytest -q --alluredir=allure-results
+allure serve allure-results
 ```
 
-### 3) Запуск с открытым браузером (PowerShell)
+## Запуск с открытым браузером
 
 ```powershell
 $env:HEADLESS="0"; pytest -q --alluredir=allure-results
 ```
 
-### 4) Allure
+## Что именно проверяют тесты
+- Каждый URL из `config/urls_mobile.txt` прогоняется 2 раза:
+  - на `devices["iPhone 13"]`
+  - на `devices["Pixel 7"]`
+- Название теста в Allure: `Мобайл смоук | {device_name} | {url}`.
+- Навигация: `page.goto(url, wait_until="domcontentloaded")`.
+- Стабилизация после открытия:
+  1. попытка дождаться `networkidle` (до 20 сек, без падения);
+  2. пауза 800 мс;
+  3. ожидание `document.readyState === "complete"`;
+  4. проверка, что `document.body` существует и содержит текст.
+- Проверка HTTP-статусов:
+  - для `https://m.sport-express.ru/asdasdasd/` ожидается `404`;
+  - для всех остальных URL допустимы: `200`, `301`, `302`, `304`;
+  - `response == None` всегда приводит к падению.
+- Ошибки консоли (`console.type == "error"`) собираются и прикладываются в Allure как
+  `Ошибки консоли (не блокируют)`, но не валят тест.
+- Скриншот прикладывается **только при падении**.
 
-```bash
-allure serve allure-results
-```
+## Повторы упавших тестов
+Настроено через `pytest-rerunfailures`:
+- `--reruns 2`
+- `--reruns-delay 2`
 
-## Что проверяет каждый тест
-- открытие страницы через `page.goto(url, wait_until="domcontentloaded")`;
-- наличие объекта `response`;
-- HTTP-статус только `200` или `304`;
-- отсутствие ошибок браузерной консоли (`type == "error"`);
-- при падении: скриншот, URL, статус ответа и ошибки консоли прикладываются в Allure.
-
-## Параметры запуска
-- Эмуляция устройства: **iPhone 13** (`playwright.devices`).
-- Браузер: **Chromium**.
-- `HEADLESS=1` по умолчанию.
-- Если `HEADLESS=0`, тесты запускаются в видимом режиме.
-- Таймаут навигации: `30000 ms`.
-- Таймаут теста: `60000 ms`.
-- Повторы упавшего теста: `2` (задержка `2` секунды).
+## Формат файла URL
+Файл `config/urls_mobile.txt` поддерживает:
+- пустые строки (игнорируются);
+- строки, начинающиеся с `#` (игнорируются);
+- пробелы в начале/конце (удаляются через `strip()`).

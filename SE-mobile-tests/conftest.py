@@ -10,7 +10,7 @@ from utils.загрузчик_url import загрузить_url_из_файла
 
 КОРЕНЬ_ПРОЕКТА = Path(__file__).resolve().parent
 ФАЙЛ_URL = КОРЕНЬ_ПРОЕКТА / "config" / "urls_mobile.txt"
-ИМЯ_УСТРОЙСТВА = "iPhone 13"
+УСТРОЙСТВА = ["iPhone 13", "Pixel 7"]
 ТАЙМАУТ_НАВИГАЦИИ_МС = 30_000
 
 
@@ -18,12 +18,15 @@ def _это_истина(значение: str) -> bool:
     return str(значение).strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
-@pytest.fixture(scope="session")
-def mobile_urls() -> list[str]:
-    url_список = загрузить_url_из_файла(ФАЙЛ_URL)
-    if not url_список:
-        pytest.fail(f"Файл со ссылками пуст: {ФАЙЛ_URL}")
-    return url_список
+def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
+    if "url" in metafunc.fixturenames:
+        url_список = загрузить_url_из_файла(ФАЙЛ_URL)
+        if not url_список:
+            raise pytest.UsageError(f"Файл со ссылками пуст: {ФАЙЛ_URL}")
+        metafunc.parametrize("url", url_список, ids=url_список)
+
+    if "device_name" in metafunc.fixturenames:
+        metafunc.parametrize("device_name", УСТРОЙСТВА, ids=УСТРОЙСТВА)
 
 
 @pytest.fixture(scope="session")
@@ -41,8 +44,12 @@ def browser(playwright_instance: Playwright) -> Browser:
 
 
 @pytest.fixture
-def context(browser: Browser, playwright_instance: Playwright) -> BrowserContext:
-    профиль_устройства = playwright_instance.devices[ИМЯ_УСТРОЙСТВА]
+def context(
+    browser: Browser,
+    playwright_instance: Playwright,
+    device_name: str,
+) -> BrowserContext:
+    профиль_устройства = playwright_instance.devices[device_name]
     контекст = browser.new_context(**профиль_устройства)
     контекст.set_default_navigation_timeout(ТАЙМАУТ_НАВИГАЦИИ_МС)
     контекст.set_default_timeout(ТАЙМАУТ_НАВИГАЦИИ_МС)
