@@ -1,7 +1,35 @@
 stages:
+  - validate
   - test
 
-allure_testops:
+.validate_target_envs:
+  stage: validate
+  image: python:latest
+  script:
+    - |
+      if [ -z "${TARGET_ENVS:-}" ]; then
+        echo "Ошибка: укажи переменную TARGET_ENVS (пример: prod,stage)."
+        exit 1
+      fi
+      FOUND=0
+      for ENV in $(echo "${TARGET_ENVS}" | tr ',' ' '); do
+        case "${ENV}" in
+          prod|stage|preprod)
+            FOUND=1
+            ;;
+          *)
+            echo "Ошибка: неизвестное окружение '${ENV}'. Допустимо: prod, stage, preprod."
+            exit 1
+            ;;
+        esac
+      done
+      if [ "${FOUND}" -ne 1 ]; then
+        echo "Ошибка: в TARGET_ENVS нет поддерживаемых окружений."
+        exit 1
+      fi
+      echo "TARGET_ENVS=${TARGET_ENVS}"
+
+.allure_testops_template:
   stage: test
   image: python:latest
   variables:
@@ -17,8 +45,50 @@ allure_testops:
     - chmod +x allurectl
     - mv allurectl SE-mobile-tests/allurectl
     - cd SE-mobile-tests
-    - ./allurectl watch -- pytest -v --alluredir=allure-results
+    - |
+      if [ -z "${BASE_URL:-}" ]; then
+        echo "Ошибка: для окружения ${ENV_CODE} не задан BASE_URL."
+        exit 1
+      fi
+      echo "Запуск окружения: ${ENV_CODE} (${BASE_URL})"
+    - ALLURE_LAUNCH_NAME="Мобайл смоук | ${ENV_CODE}" ./allurectl watch -- pytest -v --alluredir=allure-results
   artifacts:
     when: always
     paths:
       - SE-mobile-tests/allure-results
+
+validate_target_envs:
+  extends: .validate_target_envs
+
+allure_testops_prod:
+  extends: .allure_testops_template
+  needs: ["validate_target_envs"]
+  variables:
+    ENV_CODE: "prod"
+    BASE_URL: "$BASE_URL_PROD"
+  rules:
+    - if: '$TARGET_ENVS =~ /(^|,\s*)prod(\s*,|$)/'
+      when: on_success
+    - when: never
+
+allure_testops_stage:
+  extends: .allure_testops_template
+  needs: ["validate_target_envs"]
+  variables:
+    ENV_CODE: "stage"
+    BASE_URL: "$BASE_URL_STAGE"
+  rules:
+    - if: '$TARGET_ENVS =~ /(^|,\s*)stage(\s*,|$)/'
+      when: on_success
+    - when: never
+
+allure_testops_preprod:
+  extends: .allure_testops_template
+  needs: ["validate_target_envs"]
+  variables:
+    ENV_CODE: "preprod"
+    BASE_URL: "$BASE_URL_PREPROD"
+  rules:
+    - if: '$TARGET_ENVS =~ /(^|,\s*)preprod(\s*,|$)/'
+      when: on_success
+    - when: never
