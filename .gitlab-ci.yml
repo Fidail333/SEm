@@ -8,17 +8,17 @@ stages:
   script:
     - |
       if [ -z "${TARGET_ENVS:-}" ]; then
-        echo "Ошибка: укажи переменную TARGET_ENVS (пример: prod,stage)."
+        echo "Ошибка: укажи переменную TARGET_ENVS (пример: prod,env0)."
         exit 1
       fi
       FOUND=0
       for ENV in $(echo "${TARGET_ENVS}" | tr ',' ' '); do
         case "${ENV}" in
-          prod|stage|preprod)
+          prod|env0|env3)
             FOUND=1
             ;;
           *)
-            echo "Ошибка: неизвестное окружение '${ENV}'. Допустимо: prod, stage, preprod."
+            echo "Ошибка: неизвестное окружение '${ENV}'. Допустимо: prod, env0, env3."
             exit 1
             ;;
         esac
@@ -65,30 +65,30 @@ allure_testops_prod:
   needs: ["validate_target_envs"]
   variables:
     ENV_CODE: "prod"
-    BASE_URL: "$BASE_URL_PROD"
+    BASE_URL: "https://m.sport-express.ru/"
   rules:
     - if: '$TARGET_ENVS =~ /(^|,\s*)prod(\s*,|$)/'
       when: on_success
     - when: never
 
-allure_testops_stage:
+allure_testops_env0:
   extends: .allure_testops_template
   needs: ["validate_target_envs"]
   variables:
-    ENV_CODE: "stage"
-    BASE_URL: "$BASE_URL_STAGE"
+    ENV_CODE: "env0"
+    BASE_URL: "http://m.sport-express.env0/"
   rules:
-    - if: '$TARGET_ENVS =~ /(^|,\s*)stage(\s*,|$)/'
+    - if: '$TARGET_ENVS =~ /(^|,\s*)env0(\s*,|$)/'
       when: on_success
     - when: never
 
-allure_testops_preprod:
+allure_testops_env3:
   extends: .allure_testops_template
   needs: ["validate_target_envs"]
   variables:
-    ENV_CODE: "preprod"
-    BASE_URL: "$BASE_URL_PREPROD"
+    ENV_CODE: "env3"
+    BASE_URL: "http://m.sport-express.env3/"
   rules:
-    - if: '$TARGET_ENVS =~ /(^|,\s*)preprod(\s*,|$)/'
+    - if: '$TARGET_ENVS =~ /(^|,\s*)env3(\s*,|$)/'
       when: on_success
     - when: never
