@@ -21,9 +21,6 @@ def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
             raise pytest.UsageError(f"Файл со ссылками пуст: {ФАЙЛ_URL}")
         metafunc.parametrize("url", url_список, ids=url_список)
 
-    if "device_name" in metafunc.fixturenames:
-        metafunc.parametrize("device_name", УСТРОЙСТВА, ids=УСТРОЙСТВА)
-
 
 @pytest.fixture(scope="function")
 def playwright_instance() -> Playwright:
@@ -32,9 +29,30 @@ def playwright_instance() -> Playwright:
 
 
 @pytest.fixture(scope="function")
+def device_name(request: pytest.FixtureRequest) -> str:
+    marker = request.node.get_closest_marker("mobile_device")
+    выбранное_устройство = str(marker.args[0]) if marker and marker.args else УСТРОЙСТВА[0]
+    if выбранное_устройство not in УСТРОЙСТВА:
+        raise pytest.UsageError(
+            f"Неизвестное устройство '{выбранное_устройство}'. Допустимые: {УСТРОЙСТВА}"
+        )
+    return выбранное_устройство
+
+
+@pytest.fixture(scope="function")
 def browser(playwright_instance: Playwright) -> Browser:
     headless = os.getenv("HEADLESS") == "1"
-    браузер = playwright_instance.chromium.launch(headless=headless)
+    allow_insecure = os.getenv("ALLOW_INSECURE") == "1"
+    base_url = os.getenv("BASE_URL", "").strip().rstrip("/")
+    launch_args: list[str] = []
+    if allow_insecure and base_url:
+        launch_args.extend(
+            [
+                "--allow-running-insecure-content",
+                f"--unsafely-treat-insecure-origin-as-secure={base_url}",
+            ]
+        )
+    браузер = playwright_instance.chromium.launch(headless=headless, args=launch_args)
     yield браузер
     браузер.close()
 
@@ -46,7 +64,8 @@ def context(
     device_name: str,
 ) -> BrowserContext:
     профиль_устройства = playwright_instance.devices[device_name]
-    контекст = browser.new_context(**профиль_устройства)
+    allow_insecure = os.getenv("ALLOW_INSECURE") == "1"
+    контекст = browser.new_context(**профиль_устройства, ignore_https_errors=allow_insecure)
     контекст.set_default_navigation_timeout(ТАЙМАУТ_НАВИГАЦИИ_МС)
     контекст.set_default_timeout(ТАЙМАУТ_НАВИГАЦИИ_МС)
     yield контекст
