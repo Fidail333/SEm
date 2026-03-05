@@ -12,3 +12,6 @@ __pycache__/
 # Allure
 allure-results/
 allure-report/
+
+# macOS
+.DS_Store

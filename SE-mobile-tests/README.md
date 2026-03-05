@@ -1,90 +1,106 @@
-# Автотесты MOBILE WEB для Sport-Express
+# SE Mobile Tests
 
-Production-ready проект автотестов для smoke-проверки мобильной версии Sport-Express на двух устройствах одновременно:
-- iPhone 13 (iOS)
-- Pixel 7 (Android)
+Автотесты mobile web для Sport-Express на Python + Pytest + Playwright + Allure.
 
-## Технологии
-- Python 3.11+
-- pytest
-- Playwright (sync API)
-- allure-pytest
-- pytest-rerunfailures
-- pytest-timeout
+## Что изменено
+- Убрана динамическая генерация тестов через `globals()`.
+- Запуск идет через нормальную параметризацию: `URL x target`.
+- Добавлен target `real_iphone` для Safari на физическом iPhone через Appium.
 
-## Структура проекта
+## Targets
+- `iphone13` — эмуляция Playwright `iPhone 13`
+- `pixel7` — эмуляция Playwright `Pixel 7`
+- `real_iphone` — реальный iPhone (Safari + Appium)
 
-```text
-SE-mobile-tests/
- ├── tests/
- │    └── test_mobile_smoke_urls.py
- ├── config/
- │    └── urls_mobile.txt
- ├── utils/
- │    ├── загрузчик_url.py
- │    └── сборщик_консоли.py
- ├── scripts/
- │    ├── setup.ps1
- │    └── run.ps1
- ├── conftest.py
- ├── pytest.ini
- ├── requirements.txt
- └── README.md
-```
+По умолчанию:
+- `--targets iphone13,pixel7`
 
-## Быстрый старт (Windows PowerShell)
+## Установка
+```bash
+python -m venv venv
+source venv/bin/activate  # macOS/Linux
+# .\venv\Scripts\Activate.ps1  # Windows
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
-```
-
-## Запуск
-
-```powershell
-.\scripts\run.ps1
-```
-
-## Ручной запуск
-
-```powershell
 pip install -r requirements.txt
 python -m playwright install
-pytest -q --alluredir=allure-results
+```
+
+## Базовый запуск
+```bash
+pytest --alluredir=allure-results
+```
+
+## Явный запуск только эмуляторов
+```bash
+pytest --targets iphone13,pixel7 --alluredir=allure-results
+```
+
+## Запуск на физическом iPhone (macOS)
+
+### 1. Подготовка
+```bash
+pip install -r requirements-ios.txt
+npm i -g appium
+appium driver install xcuitest
+```
+
+Проверь:
+- iPhone подключен кабелем и доверяет Mac.
+- На iPhone включен Developer Mode.
+- Xcode установлен.
+
+### 2. Узнать параметры устройства
+```bash
+xcrun xctrace list devices
+```
+
+Нужны:
+- `IOS_UDID`
+- `IOS_DEVICE_NAME`
+- `IOS_PLATFORM_VERSION`
+- `IOS_XCODE_ORG_ID` (Apple Team ID)
+
+### 3. Запустить Appium
+```bash
+appium --address 127.0.0.1 --port 4723
+```
+
+### 4. Запустить тесты
+```bash
+export IOS_UDID="<udid>"
+export IOS_DEVICE_NAME="<device name>"
+export IOS_PLATFORM_VERSION="<ios version>"
+export IOS_XCODE_ORG_ID="<apple_team_id>"
+export IOS_XCODE_SIGNING_ID="Apple Development"
+export IOS_WDA_BUNDLE_ID="ru.<unique>.WebDriverAgentRunner"
+
+pytest -n 1 \
+  --targets real_iphone \
+  --appium-url http://127.0.0.1:4723 \
+  --alluredir=allure-results
+```
+
+Важно:
+- Для `real_iphone` обязателен `-n 1`.
+- Проверка console errors для Safari/Appium недоступна (в отчете есть отдельная пометка).
+- При ошибке `xcodebuild failed with code 70` нужно настроить подпись WDA:
+  - открыть `Xcode -> Settings -> Accounts` и добавить Apple ID;
+  - проверить Team ID;
+  - использовать `IOS_XCODE_ORG_ID`, `IOS_XCODE_SIGNING_ID`, `IOS_WDA_BUNDLE_ID`.
+
+## Переменные окружения
+- `BASE_URL` — подмена домена для всех URL из `config/urls_mobile.txt`.
+- `HEADLESS=1` — headless режим Playwright.
+- `ALLOW_INSECURE=1` — разрешить insecure контент для нестандартных окружений.
+- `APPIUM_URL` — URL Appium (по умолчанию `http://127.0.0.1:4723`).
+- `IOS_UDID`, `IOS_DEVICE_NAME`, `IOS_PLATFORM_VERSION` — параметры реального iPhone.
+- `IOS_XCODE_ORG_ID`, `IOS_XCODE_SIGNING_ID`, `IOS_WDA_BUNDLE_ID` — подпись WebDriverAgent.
+
+## Статусы
+- Для `/asdasdasd/` ожидается `404`.
+- Для остальных URL допустимы: `200`, `301`, `302`, `304`.
+
+## Allure
+```bash
 allure serve allure-results
 ```
-
-## Запуск с открытым браузером
-
-```powershell
-$env:HEADLESS="0"; pytest -q --alluredir=allure-results
-```
-
-## Что именно проверяют тесты
-- Каждый URL из `config/urls_mobile.txt` прогоняется 2 раза:
-  - на `devices["iPhone 13"]`
-  - на `devices["Pixel 7"]`
-- Название теста в Allure: `Мобайл смоук | {device_name} | {url}`.
-- Навигация: `page.goto(url, wait_until="domcontentloaded")`.
-- Стабилизация после открытия:
-  1. попытка дождаться `networkidle` (до 20 сек, без падения);
-  2. пауза 800 мс;
-  3. ожидание `document.readyState === "complete"`;
-  4. проверка, что `document.body` существует и содержит текст.
-- Проверка HTTP-статусов:
-  - для `https://m.sport-express.ru/asdasdasd/` ожидается `404`;
-  - для всех остальных URL допустимы: `200`, `301`, `302`, `304`;
-  - `response == None` всегда приводит к падению.
-- Ошибки консоли (`console.type == "error"`) собираются и прикладываются в Allure как
-  `Ошибки консоли (не блокируют)`, но не валят тест.
-- Скриншот прикладывается **только при падении**.
-
-## Повторы упавших тестов
-Настроено через `pytest-rerunfailures`:
-- `--reruns 2`
-- `--reruns-delay 2`
-
-## Формат файла URL
-Файл `config/urls_mobile.txt` поддерживает:
-- пустые строки (игнорируются);
-- строки, начинающиеся с `#` (игнорируются);
-- пробелы в начале/конце (удаляются через `strip()`).
