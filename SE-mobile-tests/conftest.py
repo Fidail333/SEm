@@ -217,6 +217,7 @@ def _build_ios_capabilities(config: pytest.Config) -> dict[str, Any]:
         "appium:deviceName": ios_device_name,
         "appium:platformVersion": ios_platform_version,
         "appium:newCommandTimeout": 240,
+        "appium:webviewConnectTimeout": 30000,
         "appium:showXcodeLog": True,
         **({"appium:xcodeOrgId": ios_xcode_org_id} if ios_xcode_org_id else {}),
         **({"appium:xcodeSigningId": ios_xcode_signing_id} if ios_xcode_org_id else {}),

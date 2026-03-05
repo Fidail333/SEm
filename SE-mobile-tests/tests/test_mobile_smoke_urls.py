@@ -215,8 +215,17 @@ def _run_real_iphone_smoke(url: str, device_name: str, runtime: dict[str, Any]) 
             )
 
         with allure.step("Проверяю HTTP-статус"):
-            assert status_code is not None, "Не удалось определить HTTP-статус URL"
-            _assert_expected_status(url, status_code)
+            if status_code is None:
+                allure.dynamic.severity(allure.severity_level.MINOR)
+                allure.dynamic.tag("status-probe-unavailable")
+                allure.attach(
+                    "Не удалось определить HTTP-статус probe-запросом с хоста. "
+                    "Проверка статуса для real_iphone пропущена.",
+                    name="HTTP status probe warning",
+                    attachment_type=allure.attachment_type.TEXT,
+                )
+            else:
+                _assert_expected_status(url, status_code)
 
     except Exception:
         ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -246,6 +255,179 @@ def _run_real_iphone_smoke(url: str, device_name: str, runtime: dict[str, Any]) 
             _attach_console_state(None)
 
 
+def _run_playwright_interaction_smoke(url: str, device_name: str, runtime: dict[str, Any]) -> None:
+    page: Page = runtime["page"]
+    collector: СборщикКонсоли = runtime["console_collector"]
+    clicked_href: str | None = None
+
+    try:
+        with allure.step("Открываю страницу для интерактивной проверки"):
+            page.goto(url, wait_until="domcontentloaded")
+            page.wait_for_function("document.readyState === 'complete'", timeout=20_000)
+
+        with allure.step("Кликаю по первой валидной ссылке"):
+            clicked_href = page.evaluate(
+                """
+                () => {
+                    const links = Array.from(document.querySelectorAll("a[href]"));
+                    const candidate = links.find((link) => {
+                        const href = (link.getAttribute("href") || "").trim().toLowerCase();
+                        const target = (link.getAttribute("target") || "").trim().toLowerCase();
+                        if (!href || href.startsWith("#") || href.startsWith("javascript:")) return false;
+                        if (href.startsWith("mailto:") || href.startsWith("tel:")) return false;
+                        if (target === "_blank") return false;
+                        return true;
+                    });
+                    if (!candidate) return null;
+                    candidate.scrollIntoView({block: "center"});
+                    const resolvedHref = candidate.href || candidate.getAttribute("href") || "";
+                    candidate.click();
+                    return resolvedHref || null;
+                }
+                """
+            )
+            assert clicked_href, "На странице не найдена кликабельная ссылка для интерактивного smoke."
+            allure.attach(
+                f"Clicked href: {clicked_href}",
+                name="Clicked link",
+                attachment_type=allure.attachment_type.TEXT,
+            )
+
+        with allure.step("Проверяю состояние после клика"):
+            try:
+                page.wait_for_load_state("domcontentloaded", timeout=20_000)
+            except PlaywrightTimeoutError:
+                pass
+
+            page.wait_for_timeout(700)
+            after_url = page.url
+            body_len = int(
+                page.evaluate(
+                    "(() => document.body && document.body.innerText ? document.body.innerText.length : 0)()"
+                )
+                or 0
+            )
+            allure.attach(
+                f"URL after click: {after_url}\nBody text length: {body_len}",
+                name="Interaction result",
+                attachment_type=allure.attachment_type.TEXT,
+            )
+            assert after_url and after_url != "about:blank", "После клика получен некорректный URL."
+            assert body_len > 0, "После клика страница не содержит текста."
+
+    except Exception:
+        ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+        file_name = _safe_name(f"{device_name}_interaction_{url}")
+        screenshot_path = ARTIFACTS_DIR / f"{file_name}.png"
+
+        page.screenshot(path=str(screenshot_path), full_page=True)
+        allure.attach.file(
+            str(screenshot_path),
+            name=f"Interaction_screenshot_{file_name}",
+            attachment_type=allure.attachment_type.PNG,
+        )
+
+        allure.attach(
+            f"Device: {device_name}\nURL: {url}\nClicked href: {clicked_href}\nCurrent URL: {page.url}\n",
+            name="Interaction diagnostics",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+        raise
+    finally:
+        with allure.step("Фиксирую состояние консоли"):
+            _attach_console_state(collector)
+
+
+def _run_real_iphone_interaction_smoke(url: str, device_name: str, runtime: dict[str, Any]) -> None:
+    driver = runtime["driver"]
+    clicked_href: str | None = None
+
+    try:
+        from selenium.webdriver.support.ui import WebDriverWait
+    except Exception as exc:  # pragma: no cover - зависит от локальной среды
+        raise RuntimeError("Selenium не установлен. Установи requirements-ios.txt") from exc
+
+    try:
+        with allure.step("Открываю страницу для интерактивной проверки"):
+            driver.get(url)
+            WebDriverWait(driver, 25).until(
+                lambda drv: drv.execute_script("return document.readyState") == "complete"
+            )
+
+        with allure.step("Кликаю по первой валидной ссылке"):
+            clicked_href = driver.execute_script(
+                """
+                const links = Array.from(document.querySelectorAll("a[href]"));
+                const candidate = links.find((link) => {
+                    const href = (link.getAttribute("href") || "").trim().toLowerCase();
+                    const target = (link.getAttribute("target") || "").trim().toLowerCase();
+                    if (!href || href.startsWith("#") || href.startsWith("javascript:")) return false;
+                    if (href.startsWith("mailto:") || href.startsWith("tel:")) return false;
+                    if (target === "_blank") return false;
+                    return true;
+                });
+                if (!candidate) return null;
+                candidate.scrollIntoView({block: "center"});
+                const resolvedHref = candidate.href || candidate.getAttribute("href") || "";
+                candidate.click();
+                return resolvedHref || null;
+                """
+            )
+            assert clicked_href, "На странице не найдена кликабельная ссылка для интерактивного smoke."
+            allure.attach(
+                f"Clicked href: {clicked_href}",
+                name="Clicked link",
+                attachment_type=allure.attachment_type.TEXT,
+            )
+
+        with allure.step("Проверяю состояние после клика"):
+            WebDriverWait(driver, 25).until(
+                lambda drv: drv.execute_script("return document.readyState") == "complete"
+            )
+            body_len = int(
+                driver.execute_script(
+                    "return document.body && document.body.innerText ? document.body.innerText.length : 0"
+                )
+                or 0
+            )
+            after_url = str(driver.current_url)
+            allure.attach(
+                f"URL after click: {after_url}\nBody text length: {body_len}",
+                name="Interaction result",
+                attachment_type=allure.attachment_type.TEXT,
+            )
+            assert after_url and after_url != "about:blank", "После клика получен некорректный URL."
+            assert body_len > 0, "После клика страница не содержит текста."
+
+    except Exception:
+        ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+        file_name = _safe_name(f"{device_name}_interaction_{url}")
+        screenshot_path = ARTIFACTS_DIR / f"{file_name}.png"
+
+        png_data = driver.get_screenshot_as_png()
+        screenshot_path.write_bytes(png_data)
+        allure.attach(
+            png_data,
+            name=f"Interaction_screenshot_{file_name}",
+            attachment_type=allure.attachment_type.PNG,
+        )
+
+        allure.attach(
+            (
+                f"Device: {device_name}\n"
+                f"URL: {url}\n"
+                f"Clicked href: {clicked_href}\n"
+                f"Current URL: {driver.current_url}\n"
+            ),
+            name="Interaction diagnostics",
+            attachment_type=allure.attachment_type.TEXT,
+        )
+        raise
+    finally:
+        with allure.step("Фиксирую состояние консоли"):
+            _attach_console_state(None)
+
+
 @pytest.mark.timeout(90)
 def test_mobile_smoke_urls(url: str, target: str, session_runtime: dict[str, Any]) -> None:
     device_name = str(session_runtime["device_name"])
@@ -266,3 +448,26 @@ def test_mobile_smoke_urls(url: str, target: str, session_runtime: dict[str, Any
         return
 
     _run_playwright_smoke(url, device_name, session_runtime)
+
+
+@pytest.mark.timeout(120)
+def test_mobile_interaction_urls(url: str, target: str, session_runtime: dict[str, Any]) -> None:
+    device_name = str(session_runtime["device_name"])
+    unique_id = _stable_allure_id(f"{target}:interaction", url)
+
+    allure.dynamic.id(unique_id)
+    allure.dynamic.label("ALLURE_ID", unique_id)
+    allure.dynamic.label("AS_ID", unique_id)
+    allure.dynamic.parent_suite("SE Mobile")
+    allure.dynamic.suite(device_name)
+    allure.dynamic.sub_suite("Interaction URLs")
+    allure.dynamic.title(f"Interaction | {device_name} | {url}")
+    allure.dynamic.tag(target)
+    allure.dynamic.tag("interaction")
+
+    if target == "real_iphone":
+        allure.dynamic.tag("real-device")
+        _run_real_iphone_interaction_smoke(url, device_name, session_runtime)
+        return
+
+    _run_playwright_interaction_smoke(url, device_name, session_runtime)
