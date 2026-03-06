@@ -4,7 +4,6 @@ import hashlib
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 import allure
@@ -13,7 +12,6 @@ from playwright.sync_api import Page, Response, TimeoutError as PlaywrightTimeou
 
 from utils.сборщик_консоли import СборщикКонсоли
 
-NEGATIVE_PATH = "/asdasdasd/"
 ALLOWED_STATUS_CODES = {200, 301, 302, 304}
 ARTIFACTS_DIR = Path("artifacts")
 
@@ -59,13 +57,7 @@ def _probe_http_status_without_redirects(url: str) -> int | None:
         return None
 
 
-def _assert_expected_status(url: str, status_code: int) -> None:
-    if urlparse(url).path.rstrip("/") == NEGATIVE_PATH.rstrip("/"):
-        assert status_code == 404, (
-            f"Для негативного URL ожидается статус 404, фактический статус: {status_code}"
-        )
-        return
-
+def _assert_expected_status(status_code: int) -> None:
     assert status_code in ALLOWED_STATUS_CODES, (
         "Недопустимый HTTP статус: "
         f"{status_code}. Допустимые: {sorted(ALLOWED_STATUS_CODES)}"
@@ -138,7 +130,7 @@ def _run_playwright_smoke(url: str, device_name: str, runtime: dict[str, Any]) -
 
         with allure.step("Проверяю HTTP-статус"):
             assert response is not None, "Переход не вернул объект ответа"
-            _assert_expected_status(url, response.status)
+            _assert_expected_status(response.status)
 
     except Exception:
         ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -225,7 +217,7 @@ def _run_real_iphone_smoke(url: str, device_name: str, runtime: dict[str, Any]) 
                     attachment_type=allure.attachment_type.TEXT,
                 )
             else:
-                _assert_expected_status(url, status_code)
+                _assert_expected_status(status_code)
 
     except Exception:
         ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -429,18 +421,25 @@ def _run_real_iphone_interaction_smoke(url: str, device_name: str, runtime: dict
 
 
 @pytest.mark.timeout(90)
-def test_mobile_smoke_urls(url: str, target: str, session_runtime: dict[str, Any]) -> None:
+def test_mobile_smoke_urls(
+    кейс_страницы: dict[str, Any], target: str, session_runtime: dict[str, Any]
+) -> None:
+    url = str(кейс_страницы["url"])
+    имя_кейса = str(кейс_страницы["название"])
+    id_кейса = str(кейс_страницы["id"])
     device_name = str(session_runtime["device_name"])
-    unique_id = _stable_allure_id(target, url)
+    unique_id = _stable_allure_id(target, f"{id_кейса}|{url}")
 
     allure.dynamic.id(unique_id)
     allure.dynamic.label("ALLURE_ID", unique_id)
     allure.dynamic.label("AS_ID", unique_id)
     allure.dynamic.parent_suite("SE Mobile")
     allure.dynamic.suite(device_name)
-    allure.dynamic.sub_suite("Smoke URLs")
-    allure.dynamic.title(f"Smoke | {device_name} | {url}")
+    allure.dynamic.sub_suite("Смоук кейсов страниц")
+    allure.dynamic.title(f"Смоук | {device_name} | {имя_кейса}")
     allure.dynamic.tag(target)
+    allure.dynamic.tag("кейс-страницы")
+    allure.dynamic.tag(id_кейса)
 
     if target == "real_iphone":
         allure.dynamic.tag("real-device")
@@ -451,19 +450,26 @@ def test_mobile_smoke_urls(url: str, target: str, session_runtime: dict[str, Any
 
 
 @pytest.mark.timeout(120)
-def test_mobile_interaction_urls(url: str, target: str, session_runtime: dict[str, Any]) -> None:
+def test_mobile_interaction_urls(
+    кейс_страницы: dict[str, Any], target: str, session_runtime: dict[str, Any]
+) -> None:
+    url = str(кейс_страницы["url"])
+    имя_кейса = str(кейс_страницы["название"])
+    id_кейса = str(кейс_страницы["id"])
     device_name = str(session_runtime["device_name"])
-    unique_id = _stable_allure_id(f"{target}:interaction", url)
+    unique_id = _stable_allure_id(f"{target}:interaction", f"{id_кейса}|{url}")
 
     allure.dynamic.id(unique_id)
     allure.dynamic.label("ALLURE_ID", unique_id)
     allure.dynamic.label("AS_ID", unique_id)
     allure.dynamic.parent_suite("SE Mobile")
     allure.dynamic.suite(device_name)
-    allure.dynamic.sub_suite("Interaction URLs")
-    allure.dynamic.title(f"Interaction | {device_name} | {url}")
+    allure.dynamic.sub_suite("Интерактив кейсов страниц")
+    allure.dynamic.title(f"Интерактив | {device_name} | {имя_кейса}")
     allure.dynamic.tag(target)
     allure.dynamic.tag("interaction")
+    allure.dynamic.tag("кейс-страницы")
+    allure.dynamic.tag(id_кейса)
 
     if target == "real_iphone":
         allure.dynamic.tag("real-device")

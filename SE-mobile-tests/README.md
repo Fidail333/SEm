@@ -4,7 +4,8 @@
 
 ## Что изменено
 - Убрана динамическая генерация тестов через `globals()`.
-- Запуск идет через нормальную параметризацию: `URL x target`.
+- Запуск идет через параметризацию: `кейс_страницы x target`.
+- Крупный набор проверок запускается на всех кейсах из `config/кейсы_страниц.py`.
 - Добавлен target `real_iphone` для Safari на физическом iPhone через Appium.
 
 ## Targets
@@ -89,7 +90,7 @@ pytest -n 1 \
   - использовать `IOS_XCODE_ORG_ID`, `IOS_XCODE_SIGNING_ID`, `IOS_WDA_BUNDLE_ID`.
 
 ## Переменные окружения
-- `BASE_URL` — подмена домена для всех URL из `config/urls_mobile.txt`.
+- `BASE_URL` — подмена домена для всех URL из `config/кейсы_страниц.py`.
 - `HEADLESS=1` — headless режим Playwright.
 - `ALLOW_INSECURE=1` — разрешить insecure контент для нестандартных окружений.
 - `APPIUM_URL` — URL Appium (по умолчанию `http://127.0.0.1:4723`).
@@ -97,8 +98,8 @@ pytest -n 1 \
 - `IOS_XCODE_ORG_ID`, `IOS_XCODE_SIGNING_ID`, `IOS_WDA_BUNDLE_ID` — подпись WebDriverAgent.
 
 ## Статусы
-- Для `/asdasdasd/` ожидается `404`.
-- Для остальных URL допустимы: `200`, `301`, `302`, `304`.
+- Для кейсов страниц допустимы: `200`, `301`, `302`, `304`.
+- Исключенные URL (`/asdasdasd/`, `/stavki-na-sport/`, `/games/`) не участвуют в кейсах.
 
 ## Allure
 ```bash

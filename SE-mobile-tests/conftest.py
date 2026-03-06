@@ -1,17 +1,14 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from typing import Any
 
 import pytest
 from playwright.sync_api import Browser, BrowserContext, Page, Playwright, sync_playwright
 
-from utils.загрузчик_url import загрузить_url_из_файла
+from utils.загрузчик_кейсов_страниц import загрузить_кейсы_страниц
 from utils.сборщик_консоли import СборщикКонсоли
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-URL_FILE = PROJECT_ROOT / "config" / "urls_mobile.txt"
 NAVIGATION_TIMEOUT_MS = 30_000
 
 EMULATED_TARGETS: dict[str, str] = {
@@ -109,11 +106,18 @@ def _read_targets(config: pytest.Config) -> list[str]:
 
 
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
-    if "url" in metafunc.fixturenames:
-        urls = загрузить_url_из_файла(URL_FILE)
-        if not urls:
-            raise pytest.UsageError(f"Файл со ссылками пуст: {URL_FILE}")
-        metafunc.parametrize("url", urls, ids=urls)
+    if "кейс_страницы" in metafunc.fixturenames or "url" in metafunc.fixturenames:
+        кейсы = загрузить_кейсы_страниц()
+        if not кейсы:
+            raise pytest.UsageError("Список кейсов страниц пуст: config/кейсы_страниц.py")
+
+        if "кейс_страницы" in metafunc.fixturenames:
+            ids = [f"{кейс['id']}|{кейс['название']}" for кейс in кейсы]
+            metafunc.parametrize("кейс_страницы", кейсы, ids=ids)
+
+        if "url" in metafunc.fixturenames:
+            urls = [str(кейс["url"]) for кейс in кейсы]
+            metafunc.parametrize("url", urls, ids=urls)
 
     if "target" in metafunc.fixturenames:
         targets = _read_targets(metafunc.config)
